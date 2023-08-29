@@ -1,0 +1,53 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to deploy lambda function and eventbridge rule
+Parameters:
+  LambdaFunctionName:
+    Type: String
+    Description: "Name of the Lambda Function"
+  S3Bucket:
+    Type: String
+    Description: "S3 Bucket name where lambda function is stored"
+  S3Key:
+    Type: String
+    Description: "S3 Key and zip-file name (i.e. path/to/file.zip)"
+  IAMRoleARN:
+    Type: String
+    Description: "IAM Role name which invokes the lambda function"
+  EventBridgeRuleName:
+    Type: String
+    Description: "Name of the EventBridge Rule"
+Resources:
+  LambdaToUpdateDynamoDB:
+    Type: AWS::Lambda::Function
+    Properties:
+        Description: Lambda function to manage license from DynamoDB
+        FunctionName: !Ref LambdaFunctionName
+        Handler: lambda_function.lambda_handler
+        Timeout: 120
+        Role: !Ref IAMRoleARN
+        Runtime: python3.8
+        PackageType: Zip
+        Code:
+            S3Bucket: !Ref S3Bucket
+            S3Key: !Ref S3Key
+  EventRuleToTriggerLambdaFunction:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Eventbridge rule to trigger Lamba function"
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - EC2 Instance State-change Notification
+        detail:
+          state:
+            - running
+      Name: !Ref EventBridgeRuleName
+      State: ENABLED
+      Targets:
+        - Id: event-rule-triggers-lambda
+          Arn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}"
+    DependsOn:
+      - LambdaToUpdateDynamoDB

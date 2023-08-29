@@ -1,0 +1,30 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for EventBridge rule in Target Account (e.g. Shared Service Account)
+Parameters:
+  EventBridgeRuleName:
+    Type: String
+    Description: "Name of the EventBridge Rule"
+  LambdaFunctionName:
+    Type: String
+    Description: "Name of the Lambda Function"
+Resources:
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Description: "EventBridge rule to trigger Lambda Function in Target AWS Account"
+    Properties:
+      Description: "Eventbridge rule to trigger lambda function in target account"
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - EC2 Instance State-change Notification
+        detail:
+          state:
+            - running
+      Name: !Ref EventBridgeRuleName
+      State: ENABLED
+      Targets:
+        - Id: event-rule-trigger-lambda-function
+          Arn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}"

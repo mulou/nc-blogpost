@@ -1,0 +1,63 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for EventBridge rule in Source Account
+Parameters:
+  EventBridgeRuleName:
+    Type: String
+    Description: "Name of the EventBridge Rule"
+  TargetAWSAccount:
+    Type: String
+    Description: "Target AWS Account (e.g. Shared Service Account)"
+  EventBridgeTargetRuleName:
+    Type: String
+    Description: "Name of the EventBridge Rule in the Target Account (e.g. Shared Service Account)"
+  InvokeEventBusRoleName:
+    Type: String
+    Description: "Name of the Role which has permission to put events on target event bus"
+Resources:
+  EventInvokeEventBusRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Description: "Role which has permission to put events on target event bus"
+      RoleName: !Ref InvokeEventBusRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: 'EventInvokeEventBusServicePolicy'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "events:PutEvents"
+                Resource: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus:${EventBridgeTargetRuleName}"
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Description: "EventBridge rule to trigger EventBrige Rule in Target AWS Account"
+    Properties:
+      Description: "Eventbridge rule to trigger event bridge rule in target account"
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - EC2 Instance State-change Notification
+        detail:
+          state:
+            - running
+      Name: !Ref EventBridgeRuleName
+      State: ENABLED
+      Targets:
+        - Id: event-rule-trigger-target-event
+          Arn: !Sub "arn:aws:events:${AWS::Region}:${TargetAWSAccount}:event-bus:${EventBridgeTargetRuleName}"
+          RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/${InvokeEventBusRoleName}"
+    DependsOn:
+      - EventInvokeEventBusRole
+
